@@ -1,7 +1,7 @@
 # cacpro
 
 A dumb caching reverse proxy. One upstream, path-based rules, cache is plain files on disk
-laid out like the URL (`<cache-dir>/<host>/<path>`), so `ls`, `du` and `rm` are the admin UI.
+laid out like the URL (`<cache-dir>/<host>/<path>/_`), so `ls`, `du` and `rm` are the admin UI.
 
 Single static binary, stdlib only, ~7 MB container image built `FROM scratch`.
 
@@ -49,7 +49,7 @@ Rules are checked in order; the first match wins.
   `STALE-ERR`, `PASS`, `UPSTREAM` (non-200 relayed), `ERR`.
 
 There is no eviction. Artifacts are small; if you ever need to reclaim space,
-`find /cache -atime +365 -delete` does the job.
+`find /cache -name _ -atime +365 -delete` does the job.
 
 ## Examples
 
@@ -115,13 +115,24 @@ $ curl -sI http://localhost:8087/tarballs/jason-1.4.5.tar >/dev/null; podman log
 GET /tarballs/jason-1.4.5.tar 200 HIT 62us
 ```
 
+## Cache layout
+
+Every URL path becomes a directory and the body is the file `_` inside it:
+
+```
+/cache/repo.hex.pm/packages/jason/_
+/cache/repo.hex.pm/tarballs/jason-1.4.5.tar/_
+/cache/registry.npmjs.org/lodash/_                      # metadata
+/cache/registry.npmjs.org/lodash/-/lodash-4.17.21.tgz/_ # tarball
+```
+
+The trailing `_` is what lets `/a` and `/a/b` both be cached — registries like npm serve
+content at both. A query string, if any, is escaped into the directory name.
+
 ## Limits
 
-- Cache layout mirrors the URL, so `/a` and `/a/b` cannot both be files. npm's registry does
-  exactly that (`/lodash` is metadata, `/lodash/-/lodash-4.tgz` is the tarball); it needs a
-  different layout, which this tool does not have.
-- Query strings are part of the cache key (escaped into the file name), but nothing else is:
-  no `Vary`, no per-header caching. This is a registry cache, not a CDN.
+- The cache key is path + query, nothing else: no `Vary`, no per-header caching.
+  This is a registry cache, not a CDN.
 
 ## Performance
 

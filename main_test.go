@@ -16,7 +16,7 @@ func hitServer(b *testing.B) (*server, *http.Request) {
 		prefix:   filepath.Join(dir, "repo.hex.pm"),
 		rules:    []rule{{re: regexp.MustCompile(`^(?:/tarballs/.*)$`), ttl: forever}},
 	}
-	f := filepath.Join(s.prefix, "tarballs", "jason-1.4.4.tar")
+	f := filepath.Join(s.prefix, "tarballs", "jason-1.4.4.tar", "_")
 	os.MkdirAll(filepath.Dir(f), 0o755)
 	os.WriteFile(f, make([]byte, 26112), 0o644)
 	accessLog, _ = os.OpenFile(os.DevNull, os.O_WRONLY, 0)

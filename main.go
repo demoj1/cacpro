@@ -133,7 +133,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.RawQuery != "" {
 		key += "?" + url.QueryEscape(r.URL.RawQuery)
 	}
-	file := s.prefix + filepath.FromSlash(key)
+	// Тело лежит в <путь>/_ , а не в <путь>: у реестров /a и /a/b бывают оба файлами
+	// (npm: /lodash — метаданные, /lodash/-/lodash-4.tgz — тарбол).
+	file := s.prefix + filepath.FromSlash(key) + "/_"
 
 	f, st := open(file)
 	fresh := f != nil && (rl.ttl == forever || time.Since(st.ModTime()) < rl.ttl)
