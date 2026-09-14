@@ -131,7 +131,9 @@ content at both. A query string, if any, is escaped into the directory name.
 
 ## Limits
 
-- The cache key is path + query, nothing else: no `Vary`, no per-header caching.
+- The cache key is path + query, nothing else: no `Vary`, no per-header caching. The
+  request's `Accept` is forwarded upstream (npm uses it to pick the abbreviated package
+  document), but whatever the first client asked for is what everyone gets afterwards.
   This is a registry cache, not a CDN.
 
 ## Performance

@@ -145,9 +145,9 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case fresh:
 	case f != nil && rl.async:
 		src = "STALE"
-		go s.refresh(r.URL.RequestURI(), file)
+		go s.refresh(r.URL.RequestURI(), r.Header.Get("Accept"), file)
 	default:
-		err := s.fetch(r.URL.RequestURI(), file)
+		err := s.fetch(r.URL.RequestURI(), r.Header.Get("Accept"), file)
 		if us, ok := err.(upstreamStatus); ok {
 			w.WriteHeader(int(us))
 			logReq(r, int(us), "UPSTREAM", start)
@@ -192,15 +192,15 @@ func open(file string) (*os.File, os.FileInfo) {
 	return f, st
 }
 
-func (s *server) refresh(uri, file string) {
-	if err := s.fetch(uri, file); err != nil {
+func (s *server) refresh(uri, accept, file string) {
+	if err := s.fetch(uri, accept, file); err != nil {
 		log.Printf("фоновое обновление %s: %v", uri, err)
 	}
 }
 
 // fetch качает URI апстрима в file атомарно (tmp + rename). Одновременные промахи по одному
 // ключу выстраиваются за замком: кто пришёл вторым, видит уже свежий файл и не качает.
-func (s *server) fetch(uri, file string) error {
+func (s *server) fetch(uri, accept, file string) error {
 	started := time.Now()
 	mu := &s.locks[maphash.String(s.seed, file)%uint64(len(s.locks))]
 	mu.Lock()
@@ -210,7 +210,16 @@ func (s *server) fetch(uri, file string) error {
 		return nil
 	}
 
-	resp, err := s.client.Get(s.upstream + uri)
+	req, err := http.NewRequest(http.MethodGet, s.upstream+uri, nil)
+	if err != nil {
+		return err
+	}
+	// Accept уходит наружу как есть: npm по нему выбирает полный документ пакета или сокращённый
+	// (в 5–7 раз меньше). Ключ кэша заголовок не учитывает — что первый попросил, то и лежит.
+	if accept != "" {
+		req.Header.Set("Accept", accept)
+	}
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return err
 	}
