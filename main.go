@@ -173,9 +173,23 @@ func (s *server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// ETag обязателен: rebar3 считает 200 без него неудачей («failed: status code 200») и не
+	// ставит плагины/зависимости. Размер+mtime кэш-файла: стабилен для одного тела, меняется при
+	// обновлении; ServeContent по нему сам отвечает 304 на If-None-Match.
+	w.Header().Set("ETag", etag(st))
 	http.ServeContent(w, r, p, st.ModTime(), f)
 	f.Close()
 	logReq(r, http.StatusOK, src, start)
+}
+
+func etag(st os.FileInfo) string {
+	var arr [40]byte
+	b := append(arr[:0], '"')
+	b = strconv.AppendInt(b, st.Size(), 16)
+	b = append(b, '-')
+	b = strconv.AppendInt(b, st.ModTime().UnixNano(), 16)
+	b = append(b, '"')
+	return string(b)
 }
 
 // open возвращает открытый обычный файл и его stat, либо nil.
